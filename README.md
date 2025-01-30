@@ -9,3 +9,7 @@ This repository trains a Convolutional Neural Network (CNN) to classify fruits.
            ├── test-results/
            ├── test-results-multiple-fruits
            ├── test-multiple-fruits/
+
+3. Train the model by running the fruit_classifier.py (you can adjust the epoch and CNN variables)
+
+4. set the epoch to the saved_model you would like to use on the test.py file 

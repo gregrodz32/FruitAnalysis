@@ -71,7 +71,7 @@ if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 
 # Training loop with tqdm progress bar
-num_epochs = 10
+num_epochs = 4
 interrupt_training = False  # Flag to check if the user wants to interrupt the training loop
 
 for epoch in range(num_epochs):

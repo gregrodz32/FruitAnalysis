@@ -1,56 +1,83 @@
 import os
 import torch
-import torchvision.transforms as transforms
+from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader
 from PIL import Image
+import random
+import matplotlib.pyplot as plt
+import numpy as np
+from torch import nn
 
-# Define transformations
+# Set the base directory for dataset and model storage
+base_dir = os.getcwd()
+
+# Dataset path
+dataset_dir = os.path.join(base_dir, "dataset")
+test_dir = os.path.join(dataset_dir, "Test")
+
+# Check if Test folder exists
+if not os.path.exists(test_dir):
+    print(f"Test folder is missing. Make sure the 'Test' folder exists in the 'dataset' directory.")
+    exit()
+
+# Define transformations (same as the training transform)
 transform = transforms.Compose([
     transforms.Resize((100, 100)),
     transforms.ToTensor(),
 ])
 
-# Load the Test dataset
-test_dir = "/Users/greg/Downloads/archive/fruits-360_dataset/fruits-360/Test"  # Adjust the path to the Test folder
+# Load the test dataset
 test_dataset = ImageFolder(root=test_dir, transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-# Create a data loader for the test set
-batch_size = 1  # Set batch size to 1 for testing individual images
-test_loader = DataLoader(test_dataset, batch_size=batch_size)
+# Load the saved model
+class FruitClassifier(nn.Module):
+    def __init__(self):
+        super(FruitClassifier, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.fc1 = nn.Linear(16 * 50 * 50, 131)  # 131 classes (fruits)
 
-# Load the trained model
-model_dir = "/Users/greg/Downloads/archive/fruits-360_dataset/fruits-360/saved_model"
-model_path = os.path.join(model_dir, "fruit_classifier_epoch_10.pt")  # Adjust epoch number if needed
-model = torch.load(model_path)
+    def forward(self, x):
+        x = self.pool(torch.relu(self.conv1(x)))
+        x = x.view(-1, 16 * 50 * 50)
+        x = self.fc1(x)
+        return x
+
+# Initialize the model
+model = FruitClassifier()
+
+# Load the model weights (from epoch 10)
+model_dir = os.path.join(base_dir, "saved_model")
+model.load_state_dict(torch.load(os.path.join(model_dir, "fruit_classifier_epoch_10.pt")))
 model.eval()
 
-# Class labels
-class_labels = test_dataset.classes
+# Get the class names (labels)
+class_names = test_dataset.classes
 
-# Function to predict the class of an image
-def predict_image(image_path):
-    image = Image.open(image_path)
-    image = transform(image).unsqueeze(0)  # Add batch dimension
+# Pick 5 random images from the test dataset
+random_images_indices = random.sample(range(len(test_dataset)), 5)
+
+# Plot the images and their predictions
+fig, axes = plt.subplots(1, 5, figsize=(15, 5))
+
+for i, idx in enumerate(random_images_indices):
+    image, label = test_dataset[idx]
+    
+    # Make a prediction
     with torch.no_grad():
-        output = model(image)
-    _, predicted = torch.max(output, 1)
-    predicted_label = class_labels[predicted.item()]
-    return predicted_label
+        output = model(image.unsqueeze(0))  # Add batch dimension
+        _, predicted = torch.max(output, 1)
+    
+    predicted_label = class_names[predicted.item()]
+    true_label = class_names[label]
+    
+    # Display the image and prediction
+    axes[i].imshow(np.transpose(image.numpy(), (1, 2, 0)))  # Convert to HWC format for plt.imshow
+    axes[i].set_title(f"Pred: {predicted_label}\nTrue: {true_label}")
+    axes[i].axis('off')
 
-# Perform simple test for fruit identification
-num_correct = 0
-total_images = len(test_dataset)
-for images, labels in test_loader:
-    predicted_label = predict_image(test_loader.dataset.samples[0][0])
-    ground_truth_label = test_loader.dataset.classes[labels[0]]
-    if predicted_label == ground_truth_label:
-        num_correct += 1
-
-# Calculate accuracy
-accuracy = (num_correct / total_images) * 100
-
-# Print results
-print(f"Total Images: {total_images}")
-print(f"Correctly Identified: {num_correct}")
-print(f"Accuracy: {accuracy:.2f}%")
+# Display the plot
+plt.tight_layout()
+plt.show()
