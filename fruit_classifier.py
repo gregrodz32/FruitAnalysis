@@ -17,19 +17,27 @@ transform = transforms.Compose([
     transforms.ToTensor(),
 ])
 
-# Dataset download check
-dataset_dir = os.path.join(os.getcwd(), "dataset", "fruits")
-if not os.path.exists(dataset_dir):
-    print(f"Dataset not found at {dataset_dir}. Please download it manually from Kaggle and place it in the 'dataset/fruits' folder.")
+# Set the base directory for dataset and model storage
+base_dir = os.getcwd()
+
+# Dataset paths (adjusting for your folder structure)
+dataset_dir = os.path.join(base_dir, "dataset")
+training_dir = os.path.join(dataset_dir, "Training")
+test_dir = os.path.join(dataset_dir, "Test")
+
+# Check if Training and Test folders exist
+if not os.path.exists(training_dir) or not os.path.exists(test_dir):
+    print(f"Training or Test folders are missing. Make sure 'Training' and 'Test' folders exist in the 'dataset' directory.")
     exit()
 
-# Load dataset
-dataset = ImageFolder(root=dataset_dir, transform=transform)
+# Load the training and validation datasets
+train_dataset = ImageFolder(root=training_dir, transform=transform)
+val_dataset = ImageFolder(root=test_dir, transform=transform)
 
-# Split dataset into training and validation sets
-train_size = int(0.95 * len(dataset))
-val_size = len(dataset) - train_size
-train_set, val_set = torch.utils.data.random_split(dataset, [train_size, val_size])
+# Split the train_dataset into training and validation sets (95% train, 5% validation)
+train_size = int(0.95 * len(train_dataset))
+val_size = len(train_dataset) - train_size
+train_set, val_set = torch.utils.data.random_split(train_dataset, [train_size, val_size])
 
 # Create data loaders
 batch_size = 32
@@ -57,8 +65,8 @@ model = FruitClassifier()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# Set model directory relative to the project
-model_dir = os.path.join(os.getcwd(), "saved_model")
+# Set model directory to save the trained model
+model_dir = os.path.join(base_dir, "saved_model")
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 
@@ -75,7 +83,7 @@ for epoch in range(num_epochs):
         loss.backward()
         optimizer.step()
         epoch_train_loss += loss.item()
-        
+
         # Check if the user wants to interrupt the training loop
         if interrupt_training:
             break
@@ -118,7 +126,7 @@ with open(os.path.join(model_dir, "validation_accuracy.txt"), "w") as f:
 # Plot confusion matrix
 conf_matrix = confusion_matrix(true_labels, predicted_labels)
 plt.figure(figsize=(10, 8))
-sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=dataset.classes, yticklabels=dataset.classes)
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues", xticklabels=train_dataset.classes, yticklabels=train_dataset.classes)
 plt.xlabel('Predicted Label')
 plt.ylabel('True Label')
 plt.title('Confusion Matrix')
